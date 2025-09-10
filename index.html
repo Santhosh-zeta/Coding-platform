@@ -27,7 +27,7 @@
         ::-webkit-scrollbar-thumb:hover { background: #6b7280; }
         
         /* Style for the textareas */
-        #codeInput, #problemInput {
+        #codeInput, #problemInput, #customInput {
             font-family: 'Roboto Mono', monospace;
             tab-size: 4; -moz-tab-size: 4; -o-tab-size: 4;
             background-color: #1f2937;
@@ -80,12 +80,26 @@
     <!-- Main Content Area -->
     <main class="flex-grow container mx-auto p-4 sm:p-6 lg:p-8 flex flex-col md:flex-row gap-6 overflow-hidden">
         
-        <!-- Left Pane: Problem Description -->
-        <div class="w-full md:w-2/5 flex flex-col">
-            <div class="bg-gray-800 rounded-xl shadow-md border border-gray-700 flex flex-col flex-grow">
+        <!-- Left Pane: Problem Description & Custom Input -->
+        <div class="w-full md:w-2/5 flex flex-col gap-6">
+            <!-- Problem Description Card -->
+            <div class="h-1/2 bg-gray-800 rounded-xl shadow-md border border-gray-700 flex flex-col">
                 <h2 class="text-lg font-semibold text-emerald-400 mb-3 p-6 pb-0">Problem Description</h2>
                 <div class="p-6 pt-3 flex-grow">
                     <textarea id="problemInput" class="w-full h-full p-3 text-sm bg-gray-900 text-gray-200 border border-gray-700 focus:outline-none focus:ring-2 focus:ring-emerald-500 rounded-lg resize-none" placeholder="Enter the problem description for the AI to analyze against.&#10;For example: 'Write a function to find the maximum number in an array.'"></textarea>
+                </div>
+            </div>
+            <!-- Custom Input Card -->
+            <div class="h-1/2 bg-gray-800 rounded-xl shadow-md border border-gray-700 flex flex-col">
+                 <div class="flex items-center justify-between p-6 pb-0">
+                    <h2 class="text-lg font-semibold text-sky-400">Custom Input</h2>
+                    <button id="aiGenerateInputBtn" title="Generate sample input with AI" class="flex items-center gap-2 text-sm bg-sky-600 hover:bg-sky-700 text-white font-semibold py-1 px-3 rounded-lg transition-all duration-200 focus:outline-none focus:ring-2 focus:ring-sky-500">
+                        ✨ AI Generate
+                        <span id="aiGenerateInputSpinner" class="hidden spinner"></span>
+                    </button>
+                </div>
+                <div class="p-6 pt-3 flex-grow">
+                    <textarea id="customInput" class="w-full h-full p-3 text-sm bg-gray-900 text-gray-200 border border-gray-700 focus:outline-none focus:ring-2 focus:ring-sky-500 rounded-lg resize-none" placeholder="Provide custom input for the AI to consider during analysis. (e.g., for a C++ program reading from stdin)"></textarea>
                 </div>
             </div>
         </div>
@@ -167,6 +181,9 @@
         const analyzeSpinner = document.getElementById('analyzeSpinner');
         const aiAnalysisOutput = document.getElementById('aiAnalysisOutput');
         const problemInput = document.getElementById('problemInput');
+        const customInput = document.getElementById('customInput');
+        const aiGenerateInputBtn = document.getElementById('aiGenerateInputBtn');
+        const aiGenerateInputSpinner = document.getElementById('aiGenerateInputSpinner');
         const tabButtons = document.querySelectorAll('.tab-btn');
         const tabContents = document.querySelectorAll('.tab-content');
 
@@ -201,31 +218,43 @@
             }
         };
 
-        // --- Gemini API Analysis Logic ---
-        async function getGeminiAnalysis(problem, code, language) {
-            const apiKey = "";
-            const apiUrl = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-preview-05-20:generateContent?key=${apiKey}`;
-
-            const systemPrompt = `You are an expert code reviewer for a student learning to code. Analyze their code based on a given problem. Provide a suitability score (0-100) and constructive, encouraging suggestions. Respond in a valid JSON format: {"score": <number>, "suggestions": ["<string>", ...]}. Highlight key terms using markdown bold (**term**).`;
-            const userQuery = `Problem Description: "${problem}"\n\nStudent's Code in ${language}:\n\`\`\`${language}\n${code}\n\`\`\``;
-
+        // --- Gemini API Calls ---
+        async function callGemini(payload) {
+             const apiKey = "";
+             const apiUrl = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-preview-05-20:generateContent?key=${apiKey}`;
+             try {
+                let response = await fetch(apiUrl, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload) });
+                if (!response.ok) throw new Error(`API request failed with status ${response.status}`);
+                const result = await response.json();
+                return result.candidates?.[0]?.content?.parts?.[0]?.text;
+             } catch (error) {
+                originalConsoleLog("Gemini API Error:", error);
+                return null;
+             }
+        }
+        
+        async function getGeminiAnalysis(problem, code, language, customInputText) {
+            const systemPrompt = `You are an expert code reviewer for a student learning to code. Analyze their code based on a given problem and sample input. Provide a suitability score (0-100) and constructive, encouraging suggestions. Respond in a valid JSON format: {"score": <number>, "suggestions": ["<string>", ...]}. Highlight key terms using markdown bold (**term**).`;
+            const userQuery = `Problem Description: "${problem}"\n\nSample Input to test with:\n\`\`\`\n${customInputText}\n\`\`\`\n\nStudent's Code in ${language}:\n\`\`\`${language}\n${code}\n\`\`\``;
             const payload = {
                 systemInstruction: { parts: [{ text: systemPrompt }] },
                 contents: [{ parts: [{ text: userQuery }] }],
                 generationConfig: { responseMimeType: "application/json" }
             };
-
-            try {
-                let response = await fetch(apiUrl, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload) });
-                if (!response.ok) throw new Error(`API request failed with status ${response.status}`);
-                const result = await response.json();
-                const text = result.candidates?.[0]?.content?.parts?.[0]?.text;
-                if (text) return JSON.parse(text);
-                throw new Error("Invalid response structure from API.");
-            } catch (error) {
-                originalConsoleLog("Gemini API Error:", error);
-                return { score: 0, suggestions: [`**Error:** Could not get analysis from Gemini. Please check the console for details.`] };
-            }
+            
+            const text = await callGemini(payload);
+            if (text) return JSON.parse(text);
+            return { score: 0, suggestions: [`**Error:** Could not get analysis from Gemini. Please check the console for details.`] };
+        }
+        
+        async function getAiGeneratedInput(problem) {
+            const systemPrompt = `Based on the following problem description, generate a single, realistic sample input string that could be used to test a program solving this problem. Provide only the raw input text, nothing else. For example, if the problem is to sum two numbers, the input could be '5 10'. If it's to find the max in an array of size N, it could be '5\\n1 9 3 4 2'.`;
+            const userQuery = `Problem: "${problem}"`;
+            const payload = {
+                systemInstruction: { parts: [{ text: systemPrompt }] },
+                contents: [{ parts: [{ text: userQuery }] }]
+            };
+            return await callGemini(payload);
         }
 
         const displayAIAnalysis = (analysis) => {
@@ -260,11 +289,19 @@
                 } else {
                     aiAnalysisOutput.innerHTML = `<div class="flex items-center gap-2 text-gray-400"><div class="spinner"></div><span>Analyzing your code with Gemini...</span></div>`;
                     const lang = languageSelect.value;
-                    const analysis = await getGeminiAnalysis(problemText, codeText, lang);
+                    const customInputText = customInput.value.trim();
+                    const analysis = await getGeminiAnalysis(problemText, codeText, lang, customInputText);
                     displayAIAnalysis(analysis);
                 }
-                // Switch to AI tab automatically
                 switchTab('aiTab');
+            } else if (action === 'generateInput') {
+                const problemText = problemInput.value.trim();
+                 if (!problemText) {
+                    customInput.value = "Please enter a problem description first.";
+                } else {
+                    const generatedInput = await getAiGeneratedInput(problemText);
+                    customInput.value = generatedInput || "Could not generate input.";
+                }
             }
             
             button.disabled = false;
@@ -288,6 +325,7 @@
             handleButtonClick(debugBtn, debugSpinner, 'execute', true);
         });
         analyzeBtn.addEventListener('click', () => handleButtonClick(analyzeBtn, analyzeSpinner, 'analyze'));
+        aiGenerateInputBtn.addEventListener('click', () => handleButtonClick(aiGenerateInputBtn, aiGenerateInputSpinner, 'generateInput'));
 
         tabButtons.forEach(button => {
             button.addEventListener('click', () => switchTab(button.dataset.tab));
@@ -315,7 +353,6 @@
         // Initialize editor state
         document.addEventListener('DOMContentLoaded', () => {
             codeInput.value = '';
-            // Initial check for run/debug buttons
             languageSelect.dispatchEvent(new Event('change'));
         });
     </script>
