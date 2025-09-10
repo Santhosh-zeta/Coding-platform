@@ -33,6 +33,7 @@
             background-color: #1f2937;
             border-color: #374151;
             caret-color: #34d399;
+            transition: border-color 0.3s ease;
         }
         #problemInput { font-family: 'Inter', sans-serif; }
         
@@ -60,6 +61,25 @@
             color: #a78bfa; /* Violet-400 */
             border-bottom-color: #a78bfa;
         }
+
+        /* Interactive card hover effect */
+        .interactive-card {
+            transition: transform 0.3s ease, box-shadow 0.3s ease;
+        }
+        .interactive-card:hover {
+            transform: translateY(-4px);
+            box-shadow: 0 8px 25px rgba(0, 0, 0, 0.2);
+        }
+
+        /* Typing cursor for placeholder */
+        .typing-cursor {
+            border-right: .15em solid #34d399; /* Emerald color for cursor */
+            animation: blink-caret .75s step-end infinite;
+        }
+        @keyframes blink-caret {
+            from, to { border-color: transparent }
+            50% { border-color: #34d399; }
+        }
     </style>
 </head>
 <body class="h-screen max-h-screen flex flex-col">
@@ -83,23 +103,19 @@
         <!-- Left Pane: Problem Description & Custom Input -->
         <div class="w-full md:w-2/5 flex flex-col gap-6">
             <!-- Problem Description Card -->
-            <div class="h-1/2 bg-gray-800 rounded-xl shadow-md border border-gray-700 flex flex-col">
+            <div class="h-1/2 bg-gray-800 rounded-xl shadow-md border border-gray-700 flex flex-col interactive-card">
                 <h2 class="text-lg font-semibold text-emerald-400 mb-3 p-6 pb-0">Problem Description</h2>
                 <div class="p-6 pt-3 flex-grow">
-                    <textarea id="problemInput" class="w-full h-full p-3 text-sm bg-gray-900 text-gray-200 border border-gray-700 focus:outline-none focus:ring-2 focus:ring-emerald-500 rounded-lg resize-none" placeholder="Enter the problem description for the AI to analyze against.&#10;For example: 'Write a function to find the maximum number in an array.'"></textarea>
+                    <textarea id="problemInput" class="w-full h-full p-3 text-sm bg-gray-900 text-gray-200 border border-gray-700 focus:outline-none focus:ring-2 focus:ring-emerald-500 rounded-lg resize-none"></textarea>
                 </div>
             </div>
             <!-- Custom Input Card -->
-            <div class="h-1/2 bg-gray-800 rounded-xl shadow-md border border-gray-700 flex flex-col">
+            <div class="h-1/2 bg-gray-800 rounded-xl shadow-md border border-gray-700 flex flex-col interactive-card">
                  <div class="flex items-center justify-between p-6 pb-0">
                     <h2 class="text-lg font-semibold text-sky-400">Custom Input</h2>
-                    <button id="aiGenerateInputBtn" title="Generate sample input with AI" class="flex items-center gap-2 text-sm bg-sky-600 hover:bg-sky-700 text-white font-semibold py-1 px-3 rounded-lg transition-all duration-200 focus:outline-none focus:ring-2 focus:ring-sky-500">
-                        ✨ AI Generate
-                        <span id="aiGenerateInputSpinner" class="hidden spinner"></span>
-                    </button>
                 </div>
                 <div class="p-6 pt-3 flex-grow">
-                    <textarea id="customInput" class="w-full h-full p-3 text-sm bg-gray-900 text-gray-200 border border-gray-700 focus:outline-none focus:ring-2 focus:ring-sky-500 rounded-lg resize-none" placeholder="Provide custom input for the AI to consider during analysis. (e.g., for a C++ program reading from stdin)"></textarea>
+                    <textarea id="customInput" class="w-full h-full p-3 text-sm bg-gray-900 text-gray-200 border border-gray-700 focus:outline-none focus:ring-2 focus:ring-sky-500 rounded-lg resize-none" placeholder="Provide input for your code here..."></textarea>
                 </div>
             </div>
         </div>
@@ -107,7 +123,7 @@
         <!-- Right Pane: Editor and Output/Analysis -->
         <div class="w-full md:w-3/5 flex flex-col gap-6">
             <!-- Top Right: Code Editor -->
-            <div class="h-1/2 flex flex-col bg-gray-800 rounded-xl shadow-md border border-gray-700 overflow-hidden">
+            <div class="h-1/2 flex flex-col bg-gray-800 rounded-xl shadow-md border border-gray-700 overflow-hidden interactive-card">
                 <!-- Editor Controls -->
                 <div class="flex items-center justify-between p-3 bg-gray-900 border-b border-gray-700 flex-wrap gap-2">
                     <div class="flex items-center gap-2">
@@ -147,12 +163,12 @@
                 </div>
                 <!-- Textarea for code -->
                 <div class="flex-grow p-1">
-                     <textarea id="codeInput" class="w-full h-full p-4 text-base bg-gray-900 text-gray-200 border-2 border-transparent focus:outline-none focus:border-emerald-500 rounded-b-lg resize-none" spellcheck="false" placeholder="Write your code here..."></textarea>
+                     <textarea id="codeInput" class="w-full h-full p-4 text-base bg-gray-900 text-gray-200 border-2 border-transparent focus:outline-none focus:border-emerald-500 rounded-b-lg resize-none" spellcheck="false"></textarea>
                 </div>
             </div>
 
             <!-- Bottom Right: Tabs for Output & AI Analysis -->
-            <div class="flex-grow flex flex-col bg-gray-800 rounded-xl shadow-md border border-gray-700 overflow-hidden">
+            <div class="flex-grow flex flex-col bg-gray-800 rounded-xl shadow-md border border-gray-700 overflow-hidden interactive-card">
                 <!-- Tab Headers -->
                 <div class="flex border-b border-gray-700 bg-gray-900">
                     <button data-tab="outputTab" class="tab-btn active font-semibold text-blue-400 py-2 px-4">Output Console</button>
@@ -196,8 +212,6 @@
         const aiAnalysisOutput = document.getElementById('aiAnalysisOutput');
         const problemInput = document.getElementById('problemInput');
         const customInput = document.getElementById('customInput');
-        const aiGenerateInputBtn = document.getElementById('aiGenerateInputBtn');
-        const aiGenerateInputSpinner = document.getElementById('aiGenerateInputSpinner');
         const tabButtons = document.querySelectorAll('.tab-btn');
         const tabContents = document.querySelectorAll('.tab-content');
 
@@ -232,7 +246,7 @@
 
         // --- Core Logic ---
         const executeCode = (isDebugMode = false) => {
-            const code = code-input.value;
+            const code = codeInput.value;
             const selectedLanguage = languageSelect.value;
             outputConsole.innerHTML = ''; 
 
@@ -316,30 +330,6 @@
                 return { score: 0, suggestions: [`**Error:** Could not get analysis from OpenRouter. Check your API key and console for details.`] };
             }
         }
-        
-        async function getAiGeneratedInput(problem) {
-             const apiKey = CONFIG.GEMINI_API_KEY;
-             if (!apiKey || apiKey === "PASTE_YOUR_GOOGLE_AI_STUDIO_API_KEY_HERE") {
-                 customInput.value = "Error: Gemini API key is missing from config.ini. Cannot generate input.";
-                 return null;
-             }
-            const apiUrl = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-preview-05-20:generateContent?key=${apiKey}`;
-            const systemPrompt = `Based on the following problem description, generate a single, realistic sample input string that could be used to test a program solving this problem. Provide only the raw input text, nothing else. For example, if the problem is to sum two numbers, the input could be '5 10'. If it's to find the max in an array of size N, it could be '5\\n1 9 3 4 2'.`;
-            const userQuery = `Problem: "${problem}"`;
-            const payload = {
-                systemInstruction: { parts: [{ text: systemPrompt }] },
-                contents: [{ parts: [{ text: userQuery }] }]
-            };
-            try {
-                let response = await fetch(apiUrl, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload) });
-                if (!response.ok) throw new Error(`API request failed`);
-                const result = await response.json();
-                return result.candidates?.[0]?.content?.parts?.[0]?.text;
-            } catch(error) {
-                originalConsoleLog("AI Input Gen Error:", error);
-                return null;
-            }
-        }
 
         const displayAIAnalysis = (analysis) => {
             if (!analysis) {
@@ -385,14 +375,6 @@
                     displayAIAnalysis(analysis);
                 }
                 switchTab('aiTab');
-            } else if (action === 'generateInput') {
-                const problemText = problemInput.value.trim();
-                 if (!problemText) {
-                    customInput.value = "Please enter a problem description first.";
-                } else {
-                    const generatedInput = await getAiGeneratedInput(problemText);
-                    customInput.value = generatedInput || "Could not generate input.";
-                }
             }
             
             button.disabled = false;
@@ -405,6 +387,32 @@
             document.getElementById(tabId).classList.remove('hidden');
             document.querySelector(`[data-tab='${tabId}']`).classList.add('active');
         };
+
+        // --- New Interactivity ---
+        function typePlaceholder(element, text, speed = 75) {
+            let i = 0;
+            element.placeholder = "";
+            const cursorSpan = document.createElement('span');
+            cursorSpan.className = 'typing-cursor';
+            
+            // To prevent multiple cursors, we remove any old one.
+            if(element.nextSibling && element.nextSibling.classList.contains('typing-cursor')) {
+               element.parentNode.removeChild(element.nextSibling);
+            }
+            element.parentNode.insertBefore(cursorSpan, element.nextSibling);
+
+            function typing() {
+                if (i < text.length) {
+                    element.placeholder += text.charAt(i);
+                    i++;
+                    setTimeout(typing, speed);
+                } else {
+                    cursorSpan.style.animation = 'none'; // Stop blinking when done
+                    cursorSpan.style.display = 'none';
+                }
+            }
+            typing();
+        }
         
         // --- Event Listeners ---
         runBtn.addEventListener('click', () => {
@@ -416,7 +424,6 @@
             handleButtonClick(debugBtn, null, 'execute', true);
         });
         analyzeBtn.addEventListener('click', () => handleButtonClick(analyzeBtn, analyzeSpinner, 'analyze'));
-        aiGenerateInputBtn.addEventListener('click', () => handleButtonClick(aiGenerateInputBtn, aiGenerateInputSpinner, 'generateInput'));
 
         tabButtons.forEach(button => {
             button.addEventListener('click', () => switchTab(button.dataset.tab));
@@ -433,7 +440,7 @@
         });
 
         modelSelect.addEventListener('change', (event) => {
-             // Future logic for model switching if needed, e.g. hiding/showing elements.
+             // Future logic for model switching if needed
         });
         
         codeInput.addEventListener('keydown', function(e) {
@@ -450,6 +457,10 @@
             loadConfig();
             codeInput.value = '';
             languageSelect.dispatchEvent(new Event('change'));
+
+            // Start typing animations
+            typePlaceholder(problemInput, "e.g., 'Write a function to find the maximum number in an array.'");
+            typePlaceholder(codeInput, "console.log('Hello, World!');");
         });
     </script>
 </body>
