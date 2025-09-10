@@ -109,32 +109,41 @@
             <!-- Top Right: Code Editor -->
             <div class="h-1/2 flex flex-col bg-gray-800 rounded-xl shadow-md border border-gray-700 overflow-hidden">
                 <!-- Editor Controls -->
-                <div class="flex items-center justify-between p-3 bg-gray-900 border-b border-gray-700">
-                    <div class="relative">
-                        <select id="languageSelect" class="bg-gray-700 border border-gray-600 text-white text-sm rounded-lg focus:ring-emerald-500 focus:border-emerald-500 block w-full pl-3 pr-8 py-2 appearance-none">
-                            <option value="javascript">JavaScript</option>
-                            <option value="java">Java</option>
-                            <option value="c">C</option>
-                            <option value="cpp">C++</option>
-                        </select>
-                        <div class="pointer-events-none absolute inset-y-0 right-0 flex items-center px-2 text-gray-400">
-                            <svg class="fill-current h-4 w-4" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20"><path d="M9.293 12.95l.707.707L15.657 8l-1.414-1.414L10 10.828 5.757 6.586 4.343 8z"/></svg>
+                <div class="flex items-center justify-between p-3 bg-gray-900 border-b border-gray-700 flex-wrap gap-2">
+                    <div class="flex items-center gap-2">
+                        <div class="relative">
+                            <select id="languageSelect" class="bg-gray-700 border border-gray-600 text-white text-sm rounded-lg focus:ring-emerald-500 focus:border-emerald-500 block w-full pl-3 pr-8 py-2 appearance-none">
+                                <option value="javascript">JavaScript</option>
+                                <option value="java">Java</option>
+                                <option value="c">C</option>
+                                <option value="cpp">C++</option>
+                            </select>
+                            <div class="pointer-events-none absolute inset-y-0 right-0 flex items-center px-2 text-gray-400">
+                                <svg class="fill-current h-4 w-4" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20"><path d="M9.293 12.95l.707.707L15.657 8l-1.414-1.414L10 10.828 5.757 6.586 4.343 8z"/></svg>
+                            </div>
                         </div>
                     </div>
-                    <div class="flex items-center gap-2">
-                        <button id="analyzeBtn" class="flex items-center gap-2 bg-violet-600 hover:bg-violet-700 text-white font-bold py-2 px-4 rounded-lg transition-all duration-200 focus:outline-none focus:ring-2 focus:ring-violet-500 focus:ring-opacity-50">
-                            ✨ Analyze
-                            <span id="analyzeSpinner" class="hidden spinner"></span>
-                        </button>
+                     <div class="flex items-center gap-2">
                         <button id="debugBtn" class="flex items-center gap-2 bg-yellow-600 hover:bg-yellow-700 text-white font-bold py-2 px-4 rounded-lg transition-all duration-200 focus:outline-none focus:ring-2 focus:ring-yellow-500 focus:ring-opacity-50">
                             Debug
-                            <span id="debugSpinner" class="hidden spinner"></span>
                         </button>
                         <button id="runBtn" class="flex items-center gap-2 bg-emerald-600 hover:bg-emerald-700 text-white font-bold py-2 px-4 rounded-lg transition-all duration-200 focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:ring-opacity-50">
                             Run
-                            <span id="runSpinner" class="hidden spinner"></span>
                         </button>
                     </div>
+                </div>
+                <!-- AI Controls -->
+                <div class="flex items-center justify-between p-3 bg-gray-800 border-b border-gray-700 flex-wrap gap-2">
+                     <div class="flex items-center gap-2 flex-grow">
+                        <select id="modelSelect" class="bg-gray-700 border border-gray-600 text-white text-sm rounded-lg focus:ring-violet-500 focus:border-violet-500 block w-auto py-2">
+                            <option value="gemini">Gemini Flash</option>
+                            <option value="deepseek">DeepSeek Coder (OpenRouter)</option>
+                        </select>
+                     </div>
+                     <button id="analyzeBtn" class="flex items-center gap-2 bg-violet-600 hover:bg-violet-700 text-white font-bold py-2 px-4 rounded-lg transition-all duration-200 focus:outline-none focus:ring-2 focus:ring-violet-500 focus:ring-opacity-50">
+                            ✨ Analyze
+                            <span id="analyzeSpinner" class="hidden spinner"></span>
+                        </button>
                 </div>
                 <!-- Textarea for code -->
                 <div class="flex-grow p-1">
@@ -143,7 +152,7 @@
             </div>
 
             <!-- Bottom Right: Tabs for Output & AI Analysis -->
-            <div class="h-1/2 flex flex-col bg-gray-800 rounded-xl shadow-md border border-gray-700 overflow-hidden">
+            <div class="flex-grow flex flex-col bg-gray-800 rounded-xl shadow-md border border-gray-700 overflow-hidden">
                 <!-- Tab Headers -->
                 <div class="flex border-b border-gray-700 bg-gray-900">
                     <button data-tab="outputTab" class="tab-btn active font-semibold text-blue-400 py-2 px-4">Output Console</button>
@@ -169,6 +178,12 @@
     </main>
     
     <script>
+        // --- Configuration Store ---
+        const CONFIG = {
+            GEMINI_API_KEY: null,
+            OPENROUTER_API_KEY: null
+        };
+
         // DOM Element References
         const codeInput = document.getElementById('codeInput');
         const outputConsole = document.getElementById('output');
@@ -176,8 +191,7 @@
         const debugBtn = document.getElementById('debugBtn');
         const analyzeBtn = document.getElementById('analyzeBtn');
         const languageSelect = document.getElementById('languageSelect');
-        const runSpinner = document.getElementById('runSpinner');
-        const debugSpinner = document.getElementById('debugSpinner');
+        const modelSelect = document.getElementById('modelSelect');
         const analyzeSpinner = document.getElementById('analyzeSpinner');
         const aiAnalysisOutput = document.getElementById('aiAnalysisOutput');
         const problemInput = document.getElementById('problemInput');
@@ -190,14 +204,40 @@
         // Store the original console.log function
         const originalConsoleLog = console.log;
 
+        // --- Config Loading ---
+        async function loadConfig() {
+            try {
+                const response = await fetch('./config.ini');
+                if (!response.ok) {
+                    throw new Error('config.ini not found. Please ensure the file exists.');
+                }
+                const text = await response.text();
+                const lines = text.split('\n');
+                lines.forEach(line => {
+                    const parts = line.split('=');
+                    if (parts.length === 2) {
+                        const key = parts[0].trim();
+                        const value = parts[1].trim().replace(/['"]+/g, ''); // Remove quotes
+                        if (key === 'GEMINI_API_KEY') CONFIG.GEMINI_API_KEY = value;
+                        if (key === 'OPENROUTER_API_KEY') CONFIG.OPENROUTER_API_KEY = value;
+                    }
+                });
+                console.log("Configuration loaded.");
+            } catch (error) {
+                console.error("Failed to load config.ini:", error);
+                aiAnalysisOutput.innerHTML = `<div class="console-error"><strong>Error:</strong> Could not load or parse config.ini. Please make sure it is in the same directory as index.html and is formatted correctly.</div>`;
+                switchTab('aiTab');
+            }
+        }
+
         // --- Core Logic ---
         const executeCode = (isDebugMode = false) => {
-            const code = codeInput.value;
+            const code = code-input.value;
             const selectedLanguage = languageSelect.value;
             outputConsole.innerHTML = ''; 
 
             if (selectedLanguage !== 'javascript') {
-                outputConsole.innerHTML = `<div class="console-error">Sorry, direct execution is only supported for JavaScript in this browser environment. You can still analyze this code with Gemini.</div>`;
+                outputConsole.innerHTML = `<div class="console-error">Sorry, direct execution is only supported for JavaScript in this browser environment. You can still analyze this code with an AI model.</div>`;
                 return;
             }
 
@@ -218,43 +258,87 @@
             }
         };
 
-        // --- Gemini API Calls ---
-        async function callGemini(payload) {
-             const apiKey = "";
-             const apiUrl = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-preview-05-20:generateContent?key=${apiKey}`;
-             try {
-                let response = await fetch(apiUrl, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload) });
-                if (!response.ok) throw new Error(`API request failed with status ${response.status}`);
-                const result = await response.json();
-                return result.candidates?.[0]?.content?.parts?.[0]?.text;
-             } catch (error) {
-                originalConsoleLog("Gemini API Error:", error);
-                return null;
-             }
-        }
-        
+        // --- API Calls ---
         async function getGeminiAnalysis(problem, code, language, customInputText) {
-            const systemPrompt = `You are an expert code reviewer for a student learning to code. Analyze their code based on a given problem and sample input. Provide a suitability score (0-100) and constructive, encouraging suggestions. Respond in a valid JSON format: {"score": <number>, "suggestions": ["<string>", ...]}. Highlight key terms using markdown bold (**term**).`;
-            const userQuery = `Problem Description: "${problem}"\n\nSample Input to test with:\n\`\`\`\n${customInputText}\n\`\`\`\n\nStudent's Code in ${language}:\n\`\`\`${language}\n${code}\n\`\`\``;
-            const payload = {
+             const apiKey = CONFIG.GEMINI_API_KEY;
+             if (!apiKey || apiKey === "PASTE_YOUR_GOOGLE_AI_STUDIO_API_KEY_HERE") {
+                return { score: 0, suggestions: [`**Error:** Gemini API key is missing from config.ini.`] };
+             }
+             const apiUrl = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-preview-05-20:generateContent?key=${apiKey}`;
+             const systemPrompt = `You are an expert code reviewer for a student learning to code. Analyze their code based on a given problem and sample input. Provide a suitability score (0-100) and constructive, encouraging suggestions. Respond in a valid JSON format: {"score": <number>, "suggestions": ["<string>", ...]}. Highlight key terms using markdown bold (**term**).`;
+             const userQuery = `Problem Description: "${problem}"\n\nSample Input to test with:\n\`\`\`\n${customInputText}\n\`\`\`\n\nStudent's Code in ${language}:\n\`\`\`${language}\n${code}\n\`\`\``;
+             const payload = {
                 systemInstruction: { parts: [{ text: systemPrompt }] },
                 contents: [{ parts: [{ text: userQuery }] }],
                 generationConfig: { responseMimeType: "application/json" }
             };
-            
-            const text = await callGemini(payload);
-            if (text) return JSON.parse(text);
-            return { score: 0, suggestions: [`**Error:** Could not get analysis from Gemini. Please check the console for details.`] };
+            try {
+                let response = await fetch(apiUrl, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload) });
+                if (!response.ok) throw new Error(`API request failed with status ${response.status}`);
+                const result = await response.json();
+                const text = result.candidates?.[0]?.content?.parts?.[0]?.text;
+                 if (text) return JSON.parse(text);
+                 throw new Error("Invalid response structure from API.");
+            } catch (error) {
+                originalConsoleLog("Gemini API Error:", error);
+                return { score: 0, suggestions: [`**Error:** Could not get analysis from Gemini. Please check the console for details.`] };
+            }
+        }
+
+        async function getOpenRouterAnalysis(problem, code, language, customInputText) {
+            const apiKey = CONFIG.OPENROUTER_API_KEY;
+            if (!apiKey || apiKey === "PASTE_YOUR_OPENROUTER_API_KEY_HERE") {
+                return { score: 0, suggestions: [`**Error:** OpenRouter API key is missing from config.ini.`] };
+             }
+            const apiUrl = "https://openrouter.ai/api/v1/chat/completions";
+            const modelName = "deepseek/deepseek-coder";
+
+            const systemPrompt = `You are an expert code reviewer for a student learning to code. Analyze their code based on a given problem and sample input. Provide a suitability score (0-100) and constructive, encouraging suggestions. Respond ONLY with a valid JSON object in the specified format: {"score": <number>, "suggestions": ["<string>", ...]}. Highlight key terms in suggestions using markdown bold (**term**).`;
+            const userQuery = `Problem Description: "${problem}"\n\nSample Input to test with:\n\`\`\`\n${customInputText}\n\`\`\`\n\nStudent's Code in ${language}:\n\`\`\`${language}\n${code}\n\`\`\``;
+            const payload = {
+                model: modelName,
+                messages: [ { "role": "system", "content": systemPrompt }, { "role": "user", "content": userQuery } ],
+                response_format: { "type": "json_object" }
+            };
+            try {
+                const response = await fetch(apiUrl, {
+                    method: 'POST',
+                    headers: { 'Authorization': `Bearer ${apiKey}`, 'Content-Type': 'application/json', },
+                    body: JSON.stringify(payload)
+                });
+                if (!response.ok) throw new Error(`API request failed with status ${response.status}`);
+                const result = await response.json();
+                const text = result.choices?.[0]?.message?.content;
+                if (text) return JSON.parse(text);
+                throw new Error("Invalid response from OpenRouter API.");
+            } catch(error) {
+                originalConsoleLog("OpenRouter API Error:", error);
+                return { score: 0, suggestions: [`**Error:** Could not get analysis from OpenRouter. Check your API key and console for details.`] };
+            }
         }
         
         async function getAiGeneratedInput(problem) {
+             const apiKey = CONFIG.GEMINI_API_KEY;
+             if (!apiKey || apiKey === "PASTE_YOUR_GOOGLE_AI_STUDIO_API_KEY_HERE") {
+                 customInput.value = "Error: Gemini API key is missing from config.ini. Cannot generate input.";
+                 return null;
+             }
+            const apiUrl = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-preview-05-20:generateContent?key=${apiKey}`;
             const systemPrompt = `Based on the following problem description, generate a single, realistic sample input string that could be used to test a program solving this problem. Provide only the raw input text, nothing else. For example, if the problem is to sum two numbers, the input could be '5 10'. If it's to find the max in an array of size N, it could be '5\\n1 9 3 4 2'.`;
             const userQuery = `Problem: "${problem}"`;
             const payload = {
                 systemInstruction: { parts: [{ text: systemPrompt }] },
                 contents: [{ parts: [{ text: userQuery }] }]
             };
-            return await callGemini(payload);
+            try {
+                let response = await fetch(apiUrl, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload) });
+                if (!response.ok) throw new Error(`API request failed`);
+                const result = await response.json();
+                return result.candidates?.[0]?.content?.parts?.[0]?.text;
+            } catch(error) {
+                originalConsoleLog("AI Input Gen Error:", error);
+                return null;
+            }
         }
 
         const displayAIAnalysis = (analysis) => {
@@ -276,7 +360,7 @@
         
         const handleButtonClick = async (button, spinner, action, isDebug = false) => {
             button.disabled = true;
-            spinner.classList.remove('hidden');
+            if (spinner) spinner.classList.remove('hidden');
             
             if (action === 'execute') {
                 executeCode(isDebug);
@@ -287,10 +371,17 @@
                 if (!problemText || !codeText) {
                     aiAnalysisOutput.innerHTML = `<p class="text-yellow-400">Please enter a problem description and some code before analyzing.</p>`;
                 } else {
-                    aiAnalysisOutput.innerHTML = `<div class="flex items-center gap-2 text-gray-400"><div class="spinner"></div><span>Analyzing your code with Gemini...</span></div>`;
+                    aiAnalysisOutput.innerHTML = `<div class="flex items-center gap-2 text-gray-400"><div class="spinner"></div><span>Analyzing your code...</span></div>`;
                     const lang = languageSelect.value;
                     const customInputText = customInput.value.trim();
-                    const analysis = await getGeminiAnalysis(problemText, codeText, lang, customInputText);
+                    const selectedModel = modelSelect.value;
+                    let analysis;
+
+                    if (selectedModel === 'deepseek') {
+                        analysis = await getOpenRouterAnalysis(problemText, codeText, lang, customInputText);
+                    } else {
+                        analysis = await getGeminiAnalysis(problemText, codeText, lang, customInputText);
+                    }
                     displayAIAnalysis(analysis);
                 }
                 switchTab('aiTab');
@@ -305,7 +396,7 @@
             }
             
             button.disabled = false;
-            spinner.classList.add('hidden');
+            if (spinner) spinner.classList.add('hidden');
         };
 
         const switchTab = (tabId) => {
@@ -318,11 +409,11 @@
         // --- Event Listeners ---
         runBtn.addEventListener('click', () => {
             switchTab('outputTab');
-            handleButtonClick(runBtn, runSpinner, 'execute', false);
+            handleButtonClick(runBtn, null, 'execute', false);
         });
         debugBtn.addEventListener('click', () => {
             switchTab('outputTab');
-            handleButtonClick(debugBtn, debugSpinner, 'execute', true);
+            handleButtonClick(debugBtn, null, 'execute', true);
         });
         analyzeBtn.addEventListener('click', () => handleButtonClick(analyzeBtn, analyzeSpinner, 'analyze'));
         aiGenerateInputBtn.addEventListener('click', () => handleButtonClick(aiGenerateInputBtn, aiGenerateInputSpinner, 'generateInput'));
@@ -340,6 +431,10 @@
                 btn.classList.toggle('cursor-not-allowed', !isJs);
             });
         });
+
+        modelSelect.addEventListener('change', (event) => {
+             // Future logic for model switching if needed, e.g. hiding/showing elements.
+        });
         
         codeInput.addEventListener('keydown', function(e) {
             if (e.key === 'Tab') {
@@ -350,8 +445,9 @@
             }
         });
 
-        // Initialize editor state
+        // Initialize editor state and load config
         document.addEventListener('DOMContentLoaded', () => {
+            loadConfig();
             codeInput.value = '';
             languageSelect.dispatchEvent(new Event('change'));
         });
